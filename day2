@@ -1,0 +1,189 @@
+**Buổi 2: Dựng Khung Dự Án**
+
+Vì bạn đã chốt tên dự án và database, buổi 2 sẽ tập trung vào việc dựng **skeleton** để dự án chạy được trước. Mục tiêu là sau buổi này bạn có 2 khu riêng: `frontend` và `admin`, có kết nối DB, có router, có các trang rỗng để buổi 3 bắt đầu đổ dữ liệu.
+
+**1. Cấu trúc thư mục nên dùng**
+```txt
+TenDuAn/
+├── index.php
+├── config/
+│   └── database.php
+├── includes/
+│   ├── header.php
+│   ├── menu.php
+│   └── footer.php
+├── pages/
+│   ├── main.php
+│   ├── home.php
+│   ├── category.php
+│   ├── product.php
+│   ├── cart.php
+│   ├── checkout.php
+│   ├── login.php
+│   ├── register.php
+│   └── contact.php
+├── assets/
+│   ├── css/
+│   │   └── style.css
+│   └── images/
+├── uploads/
+│   └── products/
+└── admin/
+    ├── index.php
+    ├── login.php
+    ├── includes/
+    │   ├── header.php
+    │   ├── menu.php
+    │   └── footer.php
+    ├── pages/
+    │   ├── main.php
+    │   └── dashboard.php
+    └── modules/
+        ├── categories/
+        │   ├── list.php
+        │   ├── create.php
+        │   ├── edit.php
+        │   └── handle.php
+        ├── products/
+        │   ├── list.php
+        │   ├── create.php
+        │   ├── edit.php
+        │   └── handle.php
+        ├── orders/
+        │   └── list.php
+        └── contacts/
+            └── list.php
+```
+
+**2. Quy ước cần chốt ngay**
+- Frontend dùng `index.php?page=home`
+- Danh mục dùng `index.php?page=category&id=...`
+- Chi tiết sản phẩm dùng `index.php?page=product&id=...`
+- Admin dùng `admin/index.php?action=products&query=list`
+- Session khách hàng: `$_SESSION['customer_id']`, `$_SESSION['customer_name']`
+- Session admin: `$_SESSION['admin_id']`, `$_SESSION['admin_username']`
+- Giỏ hàng: `$_SESSION['cart']`
+
+**3. 4 file quan trọng phải có trước**
+`config/database.php`
+```php
+<?php
+$mysqli = new mysqli("localhost", "root", "", "ten_database_cua_ban");
+
+if ($mysqli->connect_errno) {
+    die("Ket noi database that bai: " . $mysqli->connect_error);
+}
+
+$mysqli->set_charset("utf8mb4");
+```
+
+`index.php`
+```php
+<?php
+session_start();
+require_once __DIR__ . '/config/database.php';
+include __DIR__ . '/includes/header.php';
+include __DIR__ . '/includes/menu.php';
+include __DIR__ . '/pages/main.php';
+include __DIR__ . '/includes/footer.php';
+```
+
+`pages/main.php`
+```php
+<?php
+$page = $_GET['page'] ?? 'home';
+
+switch ($page) {
+    case 'category':
+        include __DIR__ . '/category.php';
+        break;
+    case 'product':
+        include __DIR__ . '/product.php';
+        break;
+    case 'cart':
+        include __DIR__ . '/cart.php';
+        break;
+    case 'checkout':
+        include __DIR__ . '/checkout.php';
+        break;
+    case 'login':
+        include __DIR__ . '/login.php';
+        break;
+    case 'register':
+        include __DIR__ . '/register.php';
+        break;
+    case 'contact':
+        include __DIR__ . '/contact.php';
+        break;
+    default:
+        include __DIR__ . '/home.php';
+        break;
+}
+```
+
+`admin/index.php`
+```php
+<?php
+session_start();
+
+if (!isset($_SESSION['admin_id'])) {
+    header("Location: login.php");
+    exit;
+}
+
+require_once __DIR__ . '/../config/database.php';
+include __DIR__ . '/includes/header.php';
+include __DIR__ . '/includes/menu.php';
+include __DIR__ . '/pages/main.php';
+include __DIR__ . '/includes/footer.php';
+```
+
+**4. Router admin**
+`admin/pages/main.php`
+```php
+<?php
+$action = $_GET['action'] ?? 'dashboard';
+$query = $_GET['query'] ?? '';
+
+if ($action === 'categories' && $query === 'list') {
+    include __DIR__ . '/../modules/categories/list.php';
+} elseif ($action === 'categories' && $query === 'create') {
+    include __DIR__ . '/../modules/categories/create.php';
+} elseif ($action === 'categories' && $query === 'edit') {
+    include __DIR__ . '/../modules/categories/edit.php';
+} elseif ($action === 'products' && $query === 'list') {
+    include __DIR__ . '/../modules/products/list.php';
+} elseif ($action === 'products' && $query === 'create') {
+    include __DIR__ . '/../modules/products/create.php';
+} elseif ($action === 'products' && $query === 'edit') {
+    include __DIR__ . '/../modules/products/edit.php';
+} elseif ($action === 'orders' && $query === 'list') {
+    include __DIR__ . '/../modules/orders/list.php';
+} elseif ($action === 'contacts' && $query === 'list') {
+    include __DIR__ . '/../modules/contacts/list.php';
+} else {
+    include __DIR__ . '/dashboard.php';
+}
+```
+
+**5. Nguyên tắc làm sạch hơn dự án hiện tại**
+- File con trong `pages/` chỉ chứa phần nội dung, không chứa cả `<!DOCTYPE html> ...`
+- Mỗi module có file xử lý riêng, không gom xóa đơn hàng, liên hệ, sản phẩm vào chung một file
+- `database.php` đặt chung một chỗ, frontend và admin cùng dùng
+- Chưa cần viết logic nghiệp vụ ở buổi này, chỉ cần chạy khung
+
+**6. Việc bạn cần làm ngay**
+- Tạo đúng cây thư mục
+- Tạo 4 file khung ở trên
+- Tạo các file rỗng như `home.php`, `category.php`, `product.php`, `dashboard.php`
+- Trong mỗi file rỗng, ghi tạm 1 dòng để test, ví dụ: `echo "<h1>Home</h1>";`
+
+**7. Cách kiểm tra buổi 2 đã xong**
+Mở thử các URL:
+- `index.php`
+- `index.php?page=login`
+- `index.php?page=cart`
+- `admin/login.php`
+- `admin/index.php`
+
+Nếu router chạy đúng, bạn sẽ thấy từng trang đổi nội dung theo URL.
