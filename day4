@@ -1,0 +1,350 @@
+**Day 4: Giỏ Hàng Bằng `$_SESSION`**
+
+Hôm nay bạn sẽ làm 4 việc:
+- thêm sản phẩm vào giỏ
+- hiển thị giỏ hàng
+- cập nhật số lượng
+- xóa 1 món hoặc xóa toàn bộ
+
+Trước khi vào phần cart, bạn cần sửa 3 lỗi nền trong [menu.php](c:/Users/toann/Desktop/PHP/SneakerStore/includes/menu.php) và [product.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/product.php), vì hiện tại chúng sẽ làm flow giỏ hàng chạy sai.
+
+**1. Sửa nền trước**
+Trong [menu.php](c:/Users/toann/Desktop/PHP/SneakerStore/includes/menu.php):
+- bỏ toàn bộ `<!DOCTYPE html>`, `<html>`, `<head>`, `<body>` vì đây là file `include`
+- đổi các link `../index.php?...` thành `index.php?...`
+
+Ví dụ phần menu nên là:
+
+```php
+<?php
+$sql = "SELECT id, name FROM categories WHERE status = 1 ORDER BY sort_order ASC, id DESC";
+$result = $conn->query($sql);
+?>
+
+<nav>
+    <a href="index.php">Trang chu</a>
+    <a href="index.php?page=cart">Gio hang</a>
+    <a href="index.php?page=login">Dang nhap</a>
+    <a href="index.php?page=register">Dang ky</a>
+    <a href="index.php?page=contact">Lien he</a>
+</nav>
+
+<h3>Danh muc san pham</h3>
+<ul>
+    <?php if ($result && $result->num_rows > 0): ?>
+        <?php while ($category = $result->fetch_assoc()): ?>
+            <li>
+                <a href="index.php?page=category&id=<?php echo $category['id']; ?>">
+                    <?php echo htmlspecialchars($category['name']); ?>
+                </a>
+            </li>
+        <?php endwhile; ?>
+    <?php else: ?>
+        <li>Chua co danh muc</li>
+    <?php endif; ?>
+</ul>
+```
+
+Trong [product.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/product.php):
+- `JOIN` đang sai: phải là `products.category_id = categories.id`
+- `categories.name` phải đặt alias `AS category_name`
+- nút thêm giỏ hàng phải gửi `product_id`, không phải chỉ link sang `cart`
+
+Sửa toàn bộ file thành:
+
+```php
+<?php
+$productID = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+
+$sql = "
+    SELECT products.*, categories.name AS category_name
+    FROM products
+    LEFT JOIN categories ON products.category_id = categories.id
+    WHERE products.id = ? AND products.status = 1
+    LIMIT 1
+";
+
+$stmt = $conn->prepare($sql);
+$stmt->bind_param('i', $productID);
+$stmt->execute();
+
+$result = $stmt->get_result();
+$product = $result->fetch_assoc();
+
+if (!$product) {
+    echo '<p>San pham khong ton tai.</p>';
+    return;
+}
+
+$name = htmlspecialchars($product['name']);
+$image = htmlspecialchars($product['image']);
+$sku = htmlspecialchars($product['sku']);
+$categoryName = htmlspecialchars($product['category_name'] ?? 'Chua co');
+$price = number_format((float) $product['price'], 0, ',', '.');
+$quantity = (int) $product['quantity'];
+$summary = htmlspecialchars($product['summary']);
+$description = htmlspecialchars($product['description']);
+?>
+
+<h1><?php echo $name; ?></h1>
+
+<div class="product-detail">
+    <img src="uploads/products/<?php echo $image; ?>" alt="<?php echo $name; ?>" width="300">
+
+    <p>Ma san pham: <?php echo $sku; ?></p>
+    <p>Danh muc: <?php echo $categoryName; ?></p>
+    <p>Gia: <?php echo $price; ?> VND</p>
+    <p>So luong: <?php echo $quantity; ?></p>
+    <p>Mo ta ngan: <?php echo $summary; ?></p>
+    <p>Mo ta chi tiet: <?php echo nl2br($description); ?></p>
+
+    <form action="page/cart_action.php" method="post">
+        <input type="hidden" name="action" value="add">
+        <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
+        <input type="number" name="quantity" value="1" min="1" max="<?php echo $quantity; ?>">
+        <button type="submit">Them vao gio hang</button>
+    </form>
+</div>
+```
+
+**2. Tạo file xử lý giỏ hàng**
+Tạo file mới `SneakerStore/page/cart_action.php`.
+
+Lý do dùng file riêng: `cart.php` đang được `include` bên trong `index.php`, nên nếu xử lý rồi `header('Location: ...')` trong đó thì rất dễ lỗi vì HTML đã được xuất ra trước.
+
+Nội dung file:
+
+```php
+<?php
+session_start();
+require_once __DIR__ . '/../config/database.php';
+
+$action = $_POST['action'] ?? $_GET['action'] ?? '';
+
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = [];
+}
+
+if ($action === 'add') {
+    $productId = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
+    $quantity = isset($_POST['quantity']) ? (int) $_POST['quantity'] : 1;
+    $quantity = max(1, $quantity);
+
+    $stmt = $conn->prepare("SELECT id, name, sku, price, quantity, image FROM products WHERE id = ? AND status = 1 LIMIT 1");
+    $stmt->bind_param('i', $productId);
+    $stmt->execute();
+
+    $result = $stmt->get_result();
+    $product = $result->fetch_assoc();
+
+    if ($product) {
+        $stock = (int) $product['quantity'];
+        $quantity = min($quantity, $stock);
+
+        if ($quantity > 0) {
+            if (isset($_SESSION['cart'][$productId])) {
+                $newQuantity = $_SESSION['cart'][$productId]['quantity'] + $quantity;
+                $_SESSION['cart'][$productId]['quantity'] = min($newQuantity, $stock);
+            } else {
+                $_SESSION['cart'][$productId] = [
+                    'id' => (int) $product['id'],
+                    'name' => $product['name'],
+                    'sku' => $product['sku'],
+                    'price' => (float) $product['price'],
+                    'image' => $product['image'],
+                    'stock' => $stock,
+                    'quantity' => $quantity
+                ];
+            }
+        }
+    }
+
+    header('Location: ../index.php?page=cart');
+    exit;
+}
+
+if ($action === 'update') {
+    $productId = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
+    $quantity = isset($_POST['quantity']) ? (int) $_POST['quantity'] : 1;
+    $quantity = max(1, $quantity);
+
+    if (isset($_SESSION['cart'][$productId])) {
+        $stock = (int) $_SESSION['cart'][$productId]['stock'];
+        $_SESSION['cart'][$productId]['quantity'] = min($quantity, $stock);
+    }
+
+    header('Location: ../index.php?page=cart');
+    exit;
+}
+
+if ($action === 'remove') {
+    $productId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+
+    if (isset($_SESSION['cart'][$productId])) {
+        unset($_SESSION['cart'][$productId]);
+    }
+
+    header('Location: ../index.php?page=cart');
+    exit;
+}
+
+if ($action === 'clear') {
+    unset($_SESSION['cart']);
+    header('Location: ../index.php?page=cart');
+    exit;
+}
+
+header('Location: ../index.php');
+exit;
+```
+
+**3. Làm trang giỏ hàng**
+Điền vào [cart.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/cart.php):
+
+```php
+<?php
+$cart = $_SESSION['cart'] ?? [];
+$total = 0;
+?>
+
+<h1>Gio hang</h1>
+
+<?php if (empty($cart)): ?>
+    <p>Gio hang dang trong.</p>
+<?php else: ?>
+    <table border="1" cellspacing="0" cellpadding="10" width="100%">
+        <tr>
+            <th>San pham</th>
+            <th>Hinh anh</th>
+            <th>Don gia</th>
+            <th>So luong</th>
+            <th>Tam tinh</th>
+            <th>Thao tac</th>
+        </tr>
+
+        <?php foreach ($cart as $item): ?>
+            <?php
+            $subtotal = $item['price'] * $item['quantity'];
+            $total += $subtotal;
+            ?>
+            <tr>
+                <td>
+                    <?php echo htmlspecialchars($item['name']); ?><br>
+                    <small><?php echo htmlspecialchars($item['sku']); ?></small>
+                </td>
+                <td>
+                    <img src="uploads/products/<?php echo htmlspecialchars($item['image']); ?>" width="100" alt="">
+                </td>
+                <td>
+                    <?php echo number_format($item['price'], 0, ',', '.'); ?> VND
+                </td>
+                <td>
+                    <form action="page/cart_action.php" method="post">
+                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="product_id" value="<?php echo $item['id']; ?>">
+                        <input type="number" name="quantity" value="<?php echo $item['quantity']; ?>" min="1" max="<?php echo $item['stock']; ?>">
+                        <button type="submit">Cap nhat</button>
+                    </form>
+                </td>
+                <td>
+                    <?php echo number_format($subtotal, 0, ',', '.'); ?> VND
+                </td>
+                <td>
+                    <a href="page/cart_action.php?action=remove&id=<?php echo $item['id']; ?>">Xoa</a>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+
+        <tr>
+            <td colspan="6" style="text-align:right;">
+                <strong>Tong cong: <?php echo number_format($total, 0, ',', '.'); ?> VND</strong>
+            </td>
+        </tr>
+    </table>
+
+    <p>
+        <a href="page/cart_action.php?action=clear">Xoa tat ca</a>
+    </p>
+    <p>
+        <a href="index.php?page=checkout">Tien hanh thanh toan</a>
+    </p>
+<?php endif; ?>
+```
+
+**4. CSS tối thiểu cho Day 4**
+Nếu [style.css](c:/Users/toann/Desktop/PHP/SneakerStore/assets/css/style.css) còn ít, thêm tạm:
+
+```css
+table {
+    margin-top: 20px;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 10px;
+    text-align: center;
+}
+
+button {
+    padding: 6px 10px;
+    cursor: pointer;
+}
+
+input[type="number"] {
+    width: 60px;
+}
+```
+
+**5. Luồng hoạt động bạn cần hiểu**
+- Người dùng mở trang chi tiết sản phẩm
+- Form gửi sang `page/cart_action.php`
+- File đó đọc sản phẩm từ DB rồi lưu vào `$_SESSION['cart']`
+- Sau đó redirect về `index.php?page=cart`
+- `cart.php` chỉ có nhiệm vụ hiển thị dữ liệu trong session
+
+Cấu trúc cart hiện tại là:
+
+```php
+$_SESSION['cart'][product_id] = [
+    'id' => ...,
+    'name' => ...,
+    'sku' => ...,
+    'price' => ...,
+    'image' => ...,
+    'stock' => ...,
+    'quantity' => ...
+];
+```
+
+Cách lưu theo `product_id` như key sẽ dễ:
+- kiểm tra trùng sản phẩm
+- cập nhật số lượng
+- xóa sản phẩm
+
+**6. Cách test Day 4**
+Test theo đúng thứ tự:
+1. Vào `index.php?page=product&id=1`
+2. Thêm sản phẩm vào giỏ
+3. Mở `index.php?page=cart`
+4. Cập nhật số lượng
+5. Xóa 1 sản phẩm
+6. Xóa toàn bộ giỏ
+
+Nếu lỗi, kiểm tra:
+- bảng `products` có `id`, `name`, `sku`, `price`, `quantity`, `image`, `status`
+- file ảnh có trong `uploads/products`
+- [product.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/product.php) đã sửa đúng `JOIN`
+- [menu.php](c:/Users/toann/Desktop/PHP/SneakerStore/includes/menu.php) không còn `../index.php`
+
+**7. Bài tập Day 4**
+Hoàn thành 3 phần:
+- sửa [product.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/product.php)
+- sửa [menu.php](c:/Users/toann/Desktop/PHP/SneakerStore/includes/menu.php)
+- tạo `page/cart_action.php` và điền [cart.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/cart.php)
+
+Làm xong thì gửi tôi nội dung:
+- [product.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/product.php)
+- [cart.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/cart.php)
+- `page/cart_action.php`
+
+Tôi sẽ review rồi chuyển sang **Day 5: đăng ký, đăng nhập khách hàng**.

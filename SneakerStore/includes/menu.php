@@ -12,7 +12,7 @@
     $result = $conn->query($sql);
     ?>
     <nav>
-        <a href="../home.php">Trang chủ</a>
+        <a href="/PHP/SneakerStore/index.php">Trang chủ</a>
         <a href="../index.php?page=cart">Giỏ hàng</a>
         <a href="../index.php?page=login">Đăng nhập</a>
         <a href="../index.php?page=register">Đăng kí</a>
@@ -25,8 +25,7 @@
             while ($category = $result ->fetch_assoc()){
                 //assoc sẽ trả về dữ liệu dạng mảng dạng key value
                 echo '<li>';
-                    echo '<a href="index.php?page=category&id='.$category['id'].'"></a>';
-                    echo htmlspecialchars($category['name']);
+                    echo '<a href="index.php?page=category&id='.$category['id'].'">'.htmlspecialchars($category['name']).'</a>';
                     echo '</a>';
                 echo '</li>';
 
