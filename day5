@@ -1,0 +1,308 @@
+**Day 5: Đăng Ký, Đăng Nhập Khách Hàng**
+
+Hôm nay bạn làm xong luồng tài khoản khách:
+- đăng ký
+- đăng nhập
+- đăng xuất
+- hiện trạng thái đăng nhập trên menu
+- chặn trang thanh toán nếu chưa đăng nhập
+
+Tôi bám theo cấu trúc hiện tại của bạn: [main.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/main.php), [menu.php](c:/Users/toann/Desktop/PHP/SneakerStore/includes/menu.php), [login.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/login.php), [register.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/register.php), [checkout.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/checkout.php).
+
+**1. Chuẩn hóa session khách hàng**
+Từ giờ thống nhất dùng:
+- `$_SESSION['customer_id']`
+- `$_SESSION['customer_name']`
+- `$_SESSION['customer_email']`
+
+**2. Bảng dữ liệu cần có**
+Nếu bảng khách hàng của bạn chưa chốt, dùng mẫu này:
+
+```sql
+CREATE TABLE customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    full_name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    address VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Nếu bạn đang dùng tên cột khác thì giữ nguyên DB của bạn, nhưng sửa code cho đúng tên cột.
+
+**3. Tạo trang đăng ký**
+File [register.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/register.php):
+
+```php
+<?php
+$error = '';
+$success = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $fullName = trim($_POST['full_name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $password = trim($_POST['password'] ?? '');
+    $confirmPassword = trim($_POST['confirm_password'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $address = trim($_POST['address'] ?? '');
+
+    if ($fullName === '' || $email === '' || $password === '' || $confirmPassword === '' || $phone === '') {
+        $error = 'Vui long nhap day du thong tin.';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = 'Email khong hop le.';
+    } elseif ($password !== $confirmPassword) {
+        $error = 'Mat khau xac nhan khong khop.';
+    } elseif (strlen($password) < 6) {
+        $error = 'Mat khau phai tu 6 ky tu tro len.';
+    } else {
+        $stmt = $conn->prepare("SELECT id FROM customers WHERE email = ? LIMIT 1");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if ($result->fetch_assoc()) {
+            $error = 'Email da ton tai.';
+        } else {
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+
+            $stmt = $conn->prepare("
+                INSERT INTO customers (full_name, email, password, phone, address)
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            $stmt->bind_param("sssss", $fullName, $email, $hashedPassword, $phone, $address);
+
+            if ($stmt->execute()) {
+                $success = 'Dang ky thanh cong. Ban co the dang nhap.';
+            } else {
+                $error = 'Co loi xay ra khi dang ky.';
+            }
+        }
+    }
+}
+?>
+
+<h1>Dang ky tai khoan</h1>
+
+<?php if ($error !== ''): ?>
+    <p style="color:red;"><?php echo $error; ?></p>
+<?php endif; ?>
+
+<?php if ($success !== ''): ?>
+    <p style="color:green;"><?php echo $success; ?></p>
+<?php endif; ?>
+
+<form method="post" action="">
+    <p>
+        <label>Ho ten</label><br>
+        <input type="text" name="full_name">
+    </p>
+    <p>
+        <label>Email</label><br>
+        <input type="email" name="email">
+    </p>
+    <p>
+        <label>Mat khau</label><br>
+        <input type="password" name="password">
+    </p>
+    <p>
+        <label>Xac nhan mat khau</label><br>
+        <input type="password" name="confirm_password">
+    </p>
+    <p>
+        <label>So dien thoai</label><br>
+        <input type="text" name="phone">
+    </p>
+    <p>
+        <label>Dia chi</label><br>
+        <input type="text" name="address">
+    </p>
+    <button type="submit">Dang ky</button>
+</form>
+```
+
+**4. Tạo trang đăng nhập**
+File [login.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/login.php):
+
+Lưu ý: file này đang chứa cả `<!DOCTYPE html>...`, phải bỏ hết vì nó là file được `include`.
+
+```php
+<?php
+if (isset($_SESSION['customer_id'])) {
+    header('Location: index.php');
+    exit;
+}
+
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = trim($_POST['email'] ?? '');
+    $password = trim($_POST['password'] ?? '');
+
+    if ($email === '' || $password === '') {
+        $error = 'Vui long nhap email va mat khau.';
+    } else {
+        $stmt = $conn->prepare("SELECT id, full_name, email, password FROM customers WHERE email = ? LIMIT 1");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        $customer = $result->fetch_assoc();
+
+        if ($customer && password_verify($password, $customer['password'])) {
+            $_SESSION['customer_id'] = $customer['id'];
+            $_SESSION['customer_name'] = $customer['full_name'];
+            $_SESSION['customer_email'] = $customer['email'];
+
+            header('Location: index.php?page=cart');
+            exit;
+        } else {
+            $error = 'Email hoac mat khau khong dung.';
+        }
+    }
+}
+?>
+
+<h1>Dang nhap</h1>
+
+<?php if ($error !== ''): ?>
+    <p style="color:red;"><?php echo $error; ?></p>
+<?php endif; ?>
+
+<form method="post" action="">
+    <p>
+        <label>Email</label><br>
+        <input type="email" name="email">
+    </p>
+    <p>
+        <label>Mat khau</label><br>
+        <input type="password" name="password">
+    </p>
+    <button type="submit">Dang nhap</button>
+</form>
+```
+
+**5. Tạo trang đăng xuất**
+Tạo file mới [logout.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/logout.php):
+
+```php
+<?php
+unset($_SESSION['customer_id']);
+unset($_SESSION['customer_name']);
+unset($_SESSION['customer_email']);
+
+header('Location: index.php');
+exit;
+```
+
+Sau đó thêm route trong [main.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/main.php):
+
+```php
+case 'logout':
+    include __DIR__ . '/logout.php';
+    break;
+```
+
+**6. Sửa menu theo trạng thái đăng nhập**
+File [menu.php](c:/Users/toann/Desktop/PHP/SneakerStore/includes/menu.php) hiện vẫn còn HTML wrapper và link tương đối sai. Sửa thành:
+
+```php
+<?php
+$sql = "SELECT name, id FROM categories WHERE status = 1 ORDER BY sort_order ASC, id DESC";
+$result = $conn->query($sql);
+?>
+
+<nav>
+    <a href="index.php">Trang chu</a>
+    <a href="index.php?page=cart">Gio hang</a>
+
+    <?php if (isset($_SESSION['customer_id'])): ?>
+        <span>Xin chao, <?php echo htmlspecialchars($_SESSION['customer_name']); ?></span>
+        <a href="index.php?page=logout">Dang xuat</a>
+    <?php else: ?>
+        <a href="index.php?page=login">Dang nhap</a>
+        <a href="index.php?page=register">Dang ky</a>
+    <?php endif; ?>
+
+    <a href="index.php?page=contact">Lien he</a>
+</nav>
+
+<h3>Danh muc san pham</h3>
+<ul>
+    <?php if ($result && $result->num_rows > 0): ?>
+        <?php while ($category = $result->fetch_assoc()): ?>
+            <li>
+                <a href="index.php?page=category&id=<?php echo $category['id']; ?>">
+                    <?php echo htmlspecialchars($category['name']); ?>
+                </a>
+            </li>
+        <?php endwhile; ?>
+    <?php else: ?>
+        <li>Chua co danh muc</li>
+    <?php endif; ?>
+</ul>
+```
+
+**7. Chặn trang thanh toán nếu chưa đăng nhập**
+File [checkout.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/checkout.php):
+
+```php
+<?php
+if (!isset($_SESSION['customer_id'])) {
+    header('Location: index.php?page=login');
+    exit;
+}
+
+$cart = $_SESSION['cart'] ?? [];
+
+if (empty($cart)) {
+    echo '<p>Gio hang dang trong. Khong the thanh toan.</p>';
+    return;
+}
+?>
+
+<h1>Thanh toan</h1>
+<p>Khach hang: <?php echo htmlspecialchars($_SESSION['customer_name']); ?></p>
+<p>Email: <?php echo htmlspecialchars($_SESSION['customer_email']); ?></p>
+<p>Day la trang checkout. Day 6 se xu ly luu don hang.</p>
+```
+
+**8. Điều cần hiểu trong Day 5**
+- `register.php` chỉ tạo tài khoản
+- `login.php` kiểm tra tài khoản và nạp session
+- `logout.php` xóa session khách hàng
+- `menu.php` đọc session để đổi giao diện
+- `checkout.php` là ví dụ đầu tiên của “route cần đăng nhập”
+
+**9. Những lỗi hiện tại bạn nên sửa luôn**
+- [menu.php](c:/Users/toann/Desktop/PHP/SneakerStore/includes/menu.php) không được chứa `<!DOCTYPE html>`, `<html>`, `<body>`
+- [login.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/login.php) cũng không được chứa HTML khung ngoài
+- Link trong menu phải thống nhất dùng `index.php?page=...`
+- Sau này nếu bạn muốn chắc hơn, nên gọi `session_regenerate_id(true)` sau khi login thành công
+
+**10. Cách test Day 5**
+Test theo thứ tự:
+1. Vào `index.php?page=register`
+2. Tạo tài khoản mới
+3. Vào `index.php?page=login`
+4. Đăng nhập
+5. Kiểm tra menu có hiện tên khách hàng không
+6. Mở `index.php?page=checkout`
+7. Đăng xuất
+8. Mở lại `index.php?page=checkout` và xác nhận bị đẩy về login
+
+**11. Bài tập Day 5**
+Hoàn thành 5 file:
+- [register.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/register.php)
+- [login.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/login.php)
+- [logout.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/logout.php)
+- [menu.php](c:/Users/toann/Desktop/PHP/SneakerStore/includes/menu.php)
+- [checkout.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/checkout.php)
+
+Làm xong thì gửi tôi nội dung 3 file chính:
+- [register.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/register.php)
+- [login.php](c:/Users/toann/Desktop/PHP/SneakerStore/page/login.php)
+- [menu.php](c:/Users/toann/Desktop/PHP/SneakerStore/includes/menu.php)
+
+Tôi sẽ review rồi sang **Day 6: lưu đơn hàng vào `orders` và `order_items`**.

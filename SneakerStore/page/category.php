@@ -55,10 +55,11 @@ $productResult = $productStmt->get_result();
             <div class="product-item">
                 <a href="index.php?page=product&id=<?php echo $id; ?>">
                     <img src="uploads/products/<?php echo $image; ?>" alt="<?php echo $name; ?>" width="200">
-                    <h3><?php echo $name; ?></h3>
-                    <p>Giá: <?php echo $price; ?> VND</p>
                 </a>
+                <h3><?php echo $name; ?></h3>
+                <p>Giá: <?php echo $price; ?> VND</p>
+            
             </div>
         <?php endwhile; ?>
-    </div>
+    </div>  
 <?php endif; ?>

@@ -13,7 +13,7 @@
     ?>
     <nav>
         <a href="/PHP/SneakerStore/index.php">Trang chủ</a>
-        <a href="../index.php?page=cart">Giỏ hàng</a>
+        <a href="./index.php?page=cart">Giỏ hàng</a>
         <a href="../index.php?page=login">Đăng nhập</a>
         <a href="../index.php?page=register">Đăng kí</a>
         <a href="../index.php?page=contact">Liên hệ</a>

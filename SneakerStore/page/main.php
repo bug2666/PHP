@@ -3,7 +3,7 @@ $page = $_GET['page'] ?? 'home';
 
 switch ($page) {
     case 'cart':
-        include __DIR__ . '/cart.php';
+        include __DIR__ . '/cart/cart.php';
         break;
     case 'category':
         include __DIR__ . '/category.php';
