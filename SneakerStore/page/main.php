@@ -23,6 +23,9 @@ switch ($page) {
     case 'contact':
         include __DIR__ . '/contact.php';
         break;
+    case 'logout':
+        include __DIR__ . '/logout.php';
+        break;
     default:
         include __DIR__ . '/home.php';
 }
