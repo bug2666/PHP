@@ -1,23 +1,23 @@
 <?php
-$action = $_GET['action'] ?? 'dashboard';
-$query = $_GET['query'] ?? '';
+session_start();
+require_once __DIR__ . '/../config/database.php';
 
-if ($action === 'categories' && $query === 'list') {
-    include __DIR__ . '/../modules/categories/list.php';
-} elseif ($action === 'categories' && $query === 'create') {
-    include __DIR__ . '/../modules/categories/create.php';
-} elseif ($action === 'categories' && $query === 'edit') {
-    include __DIR__ . '/../modules/categories/edit.php';
-} elseif ($action === 'products' && $query === 'list') {
-    include __DIR__ . '/../modules/products/list.php';
-} elseif ($action === 'products' && $query === 'create') {
-    include __DIR__ . '/../modules/products/create.php';
-} elseif ($action === 'products' && $query === 'edit') {
-    include __DIR__ . '/../modules/products/edit.php';
-} elseif ($action === 'orders' && $query === 'list') {
-    include __DIR__ . '/../modules/orders/list.php';
-} elseif ($action === 'contacts' && $query === 'list') {
-    include __DIR__ . '/../modules/contacts/list.php';
-} else {
-    include __DIR__ . '/dashboard.php';
+if (!isset($_SESSION['admin_id'])) {
+    header('Location: login.php');
+    exit;
 }
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+</head>
+<body>
+    <?php include __DIR__ . '/includes/header.php'; ?>
+    <?php include __DIR__ . '/includes/menu.php'; ?>
+    <?php include __DIR__ . '/page/main.php'; ?>
+    <?php include __DIR__ . '/includes/footer.php'; ?>
+</body>
+</html>
