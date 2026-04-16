@@ -21,5 +21,5 @@ $stmt = $conn->prepare("UPDATE orders SET order_status = ? WHERE id = ?");
 $stmt->bind_param("si", $orderStatus, $orderId);
 $stmt->execute();
 
-header('Location: ../../index.php?action=orders&query=detail&id=' . $orderId);
+header('Location: ../../index.php?action=orders&query=detail&id='. $orderId);
 exit;
