@@ -9,7 +9,7 @@ switch ($page) {
         include __DIR__ . '/category.php';
         break;
     case 'checkout':
-        include __DIR__ . '/checkout.php';
+        include __DIR__ . '/Checkout/checkout.php';
         break;
     case 'login':
         include __DIR__ . '/login.php';
@@ -25,6 +25,9 @@ switch ($page) {
         break;
     case 'logout':
         include __DIR__ . '/logout.php';
+        break;
+    case 'order_success':
+        include __DIR__ . '/Checkout/order_success.php';
         break;
     default:
         include __DIR__ . '/home.php';

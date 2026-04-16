@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $customer = $result->fetch_assoc();
 
         if ($customer && md5($password) === $customer['password']) {
-            $_SESSION['customer_id'] = $customer['id'];
+            $_SESSION['customer_id'] = $customer['id']; // khởi tạo session để đánh dấu là đã đăng nhập thành cồng
             $_SESSION['customer_name'] = $customer['full_name'];
             $_SESSION['customer_email'] = $customer['email'];
 
