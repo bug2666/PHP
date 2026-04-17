@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/../auth/google/config.php';
+
+
 $error = '';
 $success = '';
 
@@ -83,3 +86,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </p>
     <button type="submit">Đăng kí</button>
 </form>
+
+<hr>
+<h2>Đăng kí bằng google</h2>
+<!-- thêm thư viện để đăng nhập được với google -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- cấu hình để biết người dùng đang đăng nhập bằng google -->
+ <div
+    id="g_id_onload"
+    data-client_id="<?php echo htmlspecialchars(GOOGLE_CLIENT_ID); ?>"
+    data-callback="handleGoogleCredentialResponse"
+    data-auto_prompt="false">
+</div>
+<!-- UI của nút -->
+<div
+    class="g_id_signin"
+    data-type="standard"
+    data-size="large"
+    data-theme="outline"
+    data-text="signin_with"
+    data-shape="rectangular"
+    data-logo_alignment="left">
+</div>
+
+<script>
+async function handleGoogleCredentialResponse(response) {
+    try {
+        const res = await fetch('auth/google/verify.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                credential: response.credential
+            })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            window.location.href = data.redirect || 'index.php';
+            return;
+        }
+
+        alert(data.message || 'Google login failed.');
+    } catch (error) {
+        alert('Cannot connect to Google login endpoint.');
+    }
+}
+</script>
