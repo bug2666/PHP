@@ -29,6 +29,9 @@ switch ($page) {
     case 'order_success':
         include __DIR__ . '/Checkout/order_success.php';
         break;
+    case 'infoUser':
+        include __DIR__ . '/user/infoUser.php';
+        break;
     default:
         include __DIR__ . '/home.php';
 }

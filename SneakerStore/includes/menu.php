@@ -15,7 +15,10 @@
         <a href="/PHP/SneakerStore/index.php">Trang chủ</a>
         <a href="/PHP/SneakerStore/index.php?page=cart">Giỏ hàng</a>
         <?php if (isset($_SESSION['customer_name'])): ?>
-            <span>Xin chào, <?php echo htmlspecialchars($_SESSION['customer_name']); ?></span>
+            <a href="/PHP/SneakerStore/index.php?page=infoUser">
+                <span>Xin chào, <?php echo htmlspecialchars($_SESSION['customer_name']); ?></span>
+            </a>
+
             <a href="/PHP/SneakerStore/index.php?page=logout">Đăng xuất</a>
         <?php else: ?>
             <a href="/PHP/SneakerStore/index.php?page=login">Đăng nhập</a>
