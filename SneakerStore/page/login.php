@@ -52,7 +52,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <input type="password" name="password">
     </p>
     <button type="submit">Đăng nhập</button>
+    <p>
+        <a href="index.php?page=forgot_password">Quên mật khẩu?</a>
+    </p>
 </form>
+
+
+
 
 <hr>
 <h2>Đăng nhập bằng google</h2>
@@ -60,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <!-- cấu hình để biết người dùng đang đăng nhập bằng google -->
- <div
+<div
     id="g_id_onload"
     data-client_id="<?php echo htmlspecialchars(GOOGLE_CLIENT_ID); ?>"
     data-callback="handleGoogleCredentialResponse"
@@ -76,31 +82,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     data-shape="rectangular"
     data-logo_alignment="left">
 </div>
-
+<!-- gửi vào api của gg để lấy được jwt -->
 <script>
-async function handleGoogleCredentialResponse(response) {
-    try {
-        const res = await fetch('auth/google/verify.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({
-                credential: response.credential
-            })
-        });
+    async function handleGoogleCredentialResponse(response) {
+        try {
+            const res = await fetch('auth/google/verify.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    credential: response.credential
+                })
+            });
 
-        const data = await res.json();
+            const data = await res.json();
 
-        if (data.success) {
-            window.location.href = data.redirect || 'index.php';
-            return;
+            if (data.success) {
+                window.location.href = data.redirect || 'index.php';
+                return;
+            }
+
+            alert(data.message || 'Google login failed.');
+        } catch (error) {
+            alert('Cannot connect to Google login endpoint.');
         }
-
-        alert(data.message || 'Google login failed.');
-    } catch (error) {
-        alert('Cannot connect to Google login endpoint.');
     }
-}
 </script>

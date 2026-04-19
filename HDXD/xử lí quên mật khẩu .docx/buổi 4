@@ -1,0 +1,410 @@
+**Buổi 4: Gửi Link Reset Qua Gmail Bằng PHPMailer**
+
+Buổi 3 của bạn đã xong phần lõi:
+- có `forgot_password.php`
+- có `reset_password.php`
+- đã có token/reset link logic
+- đang dừng ở bước hiển thị debug link
+
+Buổi 4 sẽ thay bước “hiện debug link” bằng:
+- gửi email thật qua Gmail SMTP
+
+Tôi sẽ hướng dẫn theo hướng:
+- `PHP + PHPMailer + Gmail App Password`
+
+Đây là cách dễ làm nhất với project PHP hiện tại của bạn.
+
+Nguồn chính:
+- PHPMailer official: [GitHub PHPMailer](https://github.com/PHPMailer/PHPMailer)
+- Gmail App Password: [Google Help - App Passwords](https://support.google.com/mail/answer/1173270?hl=en)
+
+---
+
+# **1. Mục tiêu Buổi 4**
+Sau buổi này bạn phải làm được:
+
+- cài PHPMailer
+- cấu hình Gmail SMTP
+- tạo file gửi mail riêng
+- sửa `request_reset.php` để gửi email thật
+- bỏ debug link khỏi giao diện
+- nhận mail reset trong Gmail
+
+---
+
+# **2. Điều kiện trước khi làm**
+Bạn cần có:
+
+1. tài khoản Gmail thật
+2. bật `2-Step Verification`
+3. tạo `App Password`
+
+### Vì sao cần App Password
+Google không khuyến khích dùng password Gmail thường cho SMTP.  
+Với app PHP như của bạn, cách phù hợp là dùng:
+- Gmail account
+- bật 2FA
+- tạo `App Password` 16 ký tự
+
+Google help hiện nói:
+- App passwords chỉ dùng khi account đã bật 2-Step Verification
+- app password thường dùng cho các app không hỗ trợ “Sign in with Google”
+
+---
+
+# **3. Cấu trúc file nên có sau Buổi 4**
+Bạn tạo thêm:
+
+```txt
+SneakerStore/
+├── config/
+│   └── mail.php
+├── mail/
+│   ├── Mailer.php
+│   └── templates/
+│       └── reset_password.php
+```
+
+### Vai trò
+- `config/mail.php`: chứa cấu hình SMTP
+- `mail/Mailer.php`: hàm gửi mail chung
+- `mail/templates/reset_password.php`: nội dung email reset
+
+---
+
+# **4. Cài PHPMailer**
+Trong thư mục project:
+
+```powershell
+cd C:\Users\toann\Desktop\PHP\SneakerStore
+composer require phpmailer/phpmailer
+```
+
+### Nếu chưa có Composer
+Bạn phải cài Composer trước.
+Buổi này giả sử bạn đã có Composer.
+
+Sau khi cài xong, project sẽ có:
+- `vendor/`
+- autoload từ Composer
+
+---
+
+# **5. Tạo config mail**
+Tạo file [mail.php](C:/Users/toann/Desktop/PHP/SneakerStore/config/mail.php)
+
+```php
+<?php
+define('MAIL_HOST', 'smtp.gmail.com');
+define('MAIL_PORT', 587);
+define('MAIL_USERNAME', 'yourgmail@gmail.com');
+define('MAIL_PASSWORD', 'YOUR_16_CHAR_APP_PASSWORD');
+define('MAIL_FROM_ADDRESS', 'yourgmail@gmail.com');
+define('MAIL_FROM_NAME', 'SneakerStore');
+```
+
+### Lưu ý
+- `MAIL_PASSWORD` ở đây là **App Password**, không phải mật khẩu Gmail thường
+- không nên public file này lên Git nếu sau này dùng thật
+
+---
+
+# **6. Tạo mail template**
+Tạo file [reset_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/mail/templates/reset_password.php)
+
+```php
+<?php
+function buildResetPasswordEmail(string $resetLink, string $email): string
+{
+    return '
+        <h2>Dat lai mat khau cho tai khoan SneakerStore</h2>
+        <p>Xin chao,</p>
+        <p>Chung toi da nhan duoc yeu cau dat lai mat khau cho tai khoan: <strong>' . htmlspecialchars($email) . '</strong></p>
+        <p>Vui long bam vao link ben duoi de dat lai mat khau:</p>
+        <p><a href="' . htmlspecialchars($resetLink) . '">' . htmlspecialchars($resetLink) . '</a></p>
+        <p>Link nay se het han sau 30 phut.</p>
+        <p>Nevu ban khong yeu cau dat lai mat khau, hay bo qua email nay.</p>
+    ';
+}
+```
+
+### Ý nghĩa
+File này chỉ trả về nội dung HTML mail, giúp bạn:
+- không nhét HTML mail thẳng vào `request_reset.php`
+- dễ sửa giao diện email sau này
+
+---
+
+# **7. Tạo file gửi mail chung**
+Tạo file [Mailer.php](C:/Users\toann\Desktop\PHP\SneakerStore\mail\Mailer.php)
+
+```php
+<?php
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../config/mail.php';
+
+function sendMail(string $toEmail, string $toName, string $subject, string $htmlBody): bool
+{
+    $mail = new PHPMailer(true);
+
+    try {
+        $mail->isSMTP();
+        $mail->Host       = MAIL_HOST;
+        $mail->SMTPAuth   = true;
+        $mail->Username   = MAIL_USERNAME;
+        $mail->Password   = MAIL_PASSWORD;
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = MAIL_PORT;
+
+        $mail->CharSet = 'UTF-8';
+
+        $mail->setFrom(MAIL_FROM_ADDRESS, MAIL_FROM_NAME);
+        $mail->addAddress($toEmail, $toName);
+
+        $mail->isHTML(true);
+        $mail->Subject = $subject;
+        $mail->Body    = $htmlBody;
+
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+```
+
+---
+
+# **8. Sửa `request_reset.php` để gửi mail thật**
+Bây giờ sửa file [request_reset.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/request_reset.php)
+
+Phiên bản mới:
+
+```php
+<?php
+session_start();
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../mail/Mailer.php';
+require_once __DIR__ . '/../../mail/templates/reset_password.php';
+
+$email = trim($_POST['email'] ?? '');
+
+unset($_SESSION['forgot_password_message']);
+unset($_SESSION['forgot_password_error']);
+unset($_SESSION['forgot_password_debug_link']);
+
+if ($email === '') {
+    $_SESSION['forgot_password_error'] = 'Vui long nhap email.';
+    header('Location: ../../index.php?page=forgot_password');
+    exit;
+}
+
+$genericMessage = 'Neu email ton tai, chung toi da gui huong dan dat lai mat khau.';
+
+$stmt = $conn->prepare("SELECT id, email, full_name FROM customers WHERE email = ? LIMIT 1");
+$stmt->bind_param("s", $email);
+$stmt->execute();
+
+$result = $stmt->get_result();
+$customer = $result->fetch_assoc();
+
+$_SESSION['forgot_password_message'] = $genericMessage;
+
+if (!$customer) {
+    header('Location: ../../index.php?page=forgot_password');
+    exit;
+}
+
+$rawToken = bin2hex(random_bytes(32));
+$tokenHash = hash('sha256', $rawToken);
+$expiresAt = date('Y-m-d H:i:s', time() + 1800);
+
+$customerId = (int) $customer['id'];
+$customerName = $customer['full_name'] ?? 'Customer';
+
+$stmtDelete = $conn->prepare("
+    DELETE FROM password_resets
+    WHERE customer_id = ? AND used_at IS NULL
+");
+$stmtDelete->bind_param("i", $customerId);
+$stmtDelete->execute();
+
+$stmtInsert = $conn->prepare("
+    INSERT INTO password_resets (customer_id, email, token_hash, expires_at)
+    VALUES (?, ?, ?, ?)
+");
+$stmtInsert->bind_param("isss", $customerId, $email, $tokenHash, $expiresAt);
+$stmtInsert->execute();
+
+$resetLink = 'http://localhost/PHP/SneakerStore/index.php?page=reset_password&token=' . urlencode($rawToken);
+
+$subject = 'Dat lai mat khau - SneakerStore';
+$htmlBody = buildResetPasswordEmail($resetLink, $email);
+
+sendMail($email, $customerName, $subject, $htmlBody);
+
+header('Location: ../../index.php?page=forgot_password');
+exit;
+```
+
+---
+
+# **9. Vì sao vẫn giữ thông báo chung**
+Dù mail gửi thành công hay thất bại, bạn vẫn nên hiện:
+- “Nếu email tồn tại, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu.”
+
+Không nên báo:
+- “Email này không có trong hệ thống”
+- “Gửi mail thất bại cho email X”
+
+Mục tiêu là tránh lộ thông tin tài khoản.
+
+---
+
+# **10. Tạm thời bỏ debug link**
+Trong [forgot_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/page/forgot_password.php), nếu bạn đã thêm phần hiện debug link ở Buổi 3, bây giờ nên bỏ đoạn đó đi.
+
+Giữ file gọn như sau:
+
+```php
+<?php
+$message = $_SESSION['forgot_password_message'] ?? '';
+$error = $_SESSION['forgot_password_error'] ?? '';
+
+unset($_SESSION['forgot_password_message']);
+unset($_SESSION['forgot_password_error']);
+?>
+
+<h1>Quen mat khau</h1>
+
+<?php if ($message !== ''): ?>
+    <p style="color:green;"><?php echo htmlspecialchars($message); ?></p>
+<?php endif; ?>
+
+<?php if ($error !== ''): ?>
+    <p style="color:red;"><?php echo htmlspecialchars($error); ?></p>
+<?php endif; ?>
+
+<form action="auth/password/request_reset.php" method="post">
+    <p>
+        <label>Email</label><br>
+        <input type="email" name="email" required>
+    </p>
+
+    <button type="submit">Gui link dat lai mat khau</button>
+</form>
+
+<p>
+    <a href="index.php?page=login">Quay lai dang nhap</a>
+</p>
+```
+
+---
+
+# **11. Cách test Buổi 4**
+Test theo đúng thứ tự:
+
+1. đảm bảo Gmail đã:
+   - bật 2-Step Verification
+   - tạo App Password
+2. điền đúng config trong [mail.php](C:/Users/toann/Desktop/PHP/SneakerStore/config/mail.php)
+3. mở:
+   - `index.php?page=forgot_password`
+4. nhập email có tồn tại trong DB
+5. submit form
+6. kiểm tra Gmail nhận mail
+7. mở mail
+8. bấm link reset
+9. xác nhận link dẫn về:
+   - `index.php?page=reset_password&token=...`
+
+Buổi này mới chỉ cần đến bước **nhận mail và bấm được link**.
+
+---
+
+# **12. Những lỗi hay gặp**
+Bạn sẽ rất dễ gặp các lỗi sau:
+
+### Sai App Password
+- dùng password Gmail thường
+- chưa bật 2FA
+- copy App Password sai
+
+### SMTP bị chặn
+- cấu hình host/port sai
+- `587 + STARTTLS` chưa đúng
+
+### Composer/autoload sai
+- chưa cài PHPMailer
+- không có `vendor/autoload.php`
+
+### Đường dẫn file sai
+- `require_once` sai path tới:
+  - `Mailer.php`
+  - `config/mail.php`
+  - `vendor/autoload.php`
+
+### SMTP gửi fail nhưng không biết lý do
+Hiện `sendMail()` đang `return false` im lặng.
+Nếu muốn debug sâu hơn, tạm thời có thể sửa `catch` để in lỗi ra session hoặc log.
+
+---
+
+# **13. Nếu muốn debug mạnh hơn**
+Tạm thời bạn có thể sửa trong [Mailer.php](C:/Users/toann/Desktop/PHP/SneakerStore/mail/Mailer.php):
+
+```php
+catch (Exception $e) {
+    $_SESSION['forgot_password_error'] = $mail->ErrorInfo;
+    return false;
+}
+```
+
+Nhưng nếu làm vậy thì:
+- phải `session_start()` ở đúng nơi
+- và chỉ nên dùng lúc debug local
+
+Tôi khuyên:
+- Buổi 4 cứ để `return false`
+- nếu không gửi được, lúc đó mới bật debug tạm
+
+---
+
+# **14. Điều bạn phải hiểu sau Buổi 4**
+Sau buổi này bạn phải nắm được:
+
+- token reset đã đi được từ DB ra email thật
+- Gmail SMTP đang chỉ là phương tiện gửi mail
+- App Password là chìa khóa để PHP SMTP làm việc với Gmail
+- nội dung email nên tách thành template riêng
+- `request_reset.php` giờ đã làm 2 việc:
+  - tạo token
+  - gửi mail
+
+---
+
+# **15. Checklist Buổi 4**
+Bạn làm xong 5 việc sau:
+
+1. cài `PHPMailer`
+2. tạo [mail.php](C:/Users/toann/Desktop/PHP/SneakerStore/config/mail.php)
+3. tạo [Mailer.php](C:/Users/toann/Desktop/PHP/SneakerStore/mail/Mailer.php)
+4. tạo [reset_password.php template](C:/Users/toann/Desktop/PHP/SneakerStore/mail/templates/reset_password.php)
+5. sửa [request_reset.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/request_reset.php) để gửi mail thật
+
+---
+
+# **16. Buổi 5 sẽ làm gì**
+Sau khi mail gửi được, Buổi 5 sẽ làm:
+- kiểm tra token ở [verify_token.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/verify_token.php)
+- xác thực token khi user mở link reset
+- cập nhật mật khẩu mới trong [perform_reset.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/perform_reset.php)
+- đánh dấu token đã dùng
+
+Tức là Buổi 5 là bước:
+**“bấm link trong Gmail xong thì reset password thành công thật”**
+
+Nếu muốn, tôi có thể đi tiếp ngay **Buổi 5**.

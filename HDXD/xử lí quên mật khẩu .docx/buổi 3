@@ -1,0 +1,456 @@
+# **Buổi 3: Tạo Token Reset Và Lưu Vào Database**
+
+Buổi này ta làm phần cốt lõi của chức năng quên mật khẩu theo **nhánh `md5`** mà bạn đã chốt.
+
+## **Mục tiêu Buổi 3**
+Sau buổi này bạn phải làm được:
+
+- nhận email từ [forgot_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/page/forgot_password.php)
+- tìm user theo email
+- tạo reset token bằng `random_bytes()`
+- hash token trước khi lưu DB
+- lưu bản ghi vào `password_resets`
+- tạo reset link
+- tạm thời hiển thị reset link ở màn hình để test trước khi tích hợp Gmail
+
+Buổi này **chưa gửi email thật**.  
+Ta sẽ làm một bước trung gian để test logic chắc trước.
+
+---
+
+# **1. Trạng thái hiện tại của code**
+Tôi đọc lại code của bạn và thấy:
+
+- [forgot_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/page/forgot_password.php): đã ổn
+- [reset_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/page/reset_password.php): đã có form
+- [request_reset.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/request_reset.php): đang trống
+- [verify_token.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/verify_token.php): đang trống
+- [perform_reset.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/perform_reset.php): đang trống
+
+Ngoài ra có một lỗi đường dẫn:
+
+Trong [reset_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/page/reset_password.php), bạn đang dùng:
+
+```php
+<form action="/PHP/SneakerStore/auth/handle/perform_reset.php" method="post">
+```
+
+Nhưng theo cấu trúc hiện tại, file của bạn nằm ở:
+- `auth/password/perform_reset.php`
+
+Tức là **sẽ phải sửa lại** ở cuối buổi này.
+
+---
+
+# **2. Buổi 3 sẽ làm theo thứ tự nào**
+Làm đúng thứ tự sau:
+
+1. kiểm tra bảng `password_resets`
+2. viết logic cho [request_reset.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/request_reset.php)
+3. tạo token thật
+4. hash token rồi lưu DB
+5. tạo reset link
+6. tạm thời hiển thị reset link để test
+7. sửa [forgot_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/page/forgot_password.php) để hiện debug link
+8. sửa action trong [reset_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/page/reset_password.php)
+
+---
+
+# **3. Bảng `password_resets` phải có**
+Nếu chưa tạo, chạy:
+
+```sql
+CREATE TABLE password_resets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Nếu đã có rồi thì bỏ qua.
+
+---
+
+# **4. Tư duy đúng của Buổi 3**
+Ở Buổi 3, ta **không gửi mail ngay** vì nếu vừa làm token vừa làm Gmail SMTP một lúc, bạn sẽ khó biết lỗi ở đâu.
+
+Ta sẽ tách ra:
+- Buổi 3: token + DB + reset link
+- Buổi 4: gửi email Gmail bằng PHPMailer
+
+Cách làm này chắc hơn.
+
+---
+
+# **5. Logic của `request_reset.php`**
+File này sẽ làm 7 việc:
+
+1. nhận email từ form
+2. validate email không rỗng
+3. tìm user trong `customers`
+4. luôn trả thông báo chung
+5. nếu user tồn tại:
+   - tạo token
+   - hash token
+   - lưu DB
+   - tạo link reset
+6. lưu link đó vào session để debug
+7. redirect về `forgot_password`
+
+---
+
+# **6. Cách tạo token**
+Ta sẽ dùng:
+
+```php
+$rawToken = bin2hex(random_bytes(32));
+```
+
+### Giải thích:
+- `random_bytes(32)` tạo 32 byte random mạnh
+- `bin2hex(...)` chuyển sang chuỗi hex để dùng trong URL
+- token này sẽ được gửi cho user qua email
+
+Ví dụ token có dạng:
+```txt
+9f7d3a6e1c...
+```
+
+---
+
+# **7. Cách lưu token vào DB**
+Ta **không lưu token thô**. Ta hash nó trước:
+
+```php
+$tokenHash = hash('sha256', $rawToken);
+```
+
+### Vì sao:
+- nếu DB bị lộ thì attacker không lấy token để reset ngay
+- đây là cách đúng hơn nhiều so với lưu token plain text
+
+---
+
+# **8. Thời hạn token**
+Ta cho token sống 30 phút:
+
+```php
+$expiresAt = date('Y-m-d H:i:s', time() + 1800);
+```
+
+`1800` giây = `30 phút`
+
+---
+
+# **9. Code hoàn chỉnh cho `request_reset.php`**
+Điền vào file [request_reset.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/request_reset.php):
+
+```php
+<?php
+session_start();
+require_once __DIR__ . '/../../config/database.php';
+
+$email = trim($_POST['email'] ?? '');
+
+/* reset flash cũ */
+unset($_SESSION['forgot_password_message']);
+unset($_SESSION['forgot_password_error']);
+unset($_SESSION['forgot_password_debug_link']);
+
+if ($email === '') {
+    $_SESSION['forgot_password_error'] = 'Vui long nhap email.';
+    header('Location: ../../index.php?page=forgot_password');
+    exit;
+}
+
+/* Thong bao chung de tranh lo email co ton tai hay khong */
+$genericMessage = 'Neu email ton tai, chung toi da gui huong dan dat lai mat khau.';
+
+/* Tim user theo email */
+$stmt = $conn->prepare("SELECT id, email FROM customers WHERE email = ? LIMIT 1");
+$stmt->bind_param("s", $email);
+$stmt->execute();
+
+$result = $stmt->get_result();
+$customer = $result->fetch_assoc();
+
+/* Luon set thong bao chung */
+$_SESSION['forgot_password_message'] = $genericMessage;
+
+if (!$customer) {
+    header('Location: ../../index.php?page=forgot_password');
+    exit;
+}
+
+/* Tao token */
+$rawToken = bin2hex(random_bytes(32));
+$tokenHash = hash('sha256', $rawToken);
+$expiresAt = date('Y-m-d H:i:s', time() + 1800); // 30 phut
+
+$customerId = (int) $customer['id'];
+
+/*
+ * Khuyen nghi:
+ * Co the xoa cac token cu chua dung cua user nay de tranh ton tai nhieu token song song
+ */
+$stmtDelete = $conn->prepare("
+    DELETE FROM password_resets
+    WHERE customer_id = ? AND used_at IS NULL
+");
+$stmtDelete->bind_param("i", $customerId);
+$stmtDelete->execute();
+
+/* Luu token moi */
+$stmtInsert = $conn->prepare("
+    INSERT INTO password_resets (customer_id, email, token_hash, expires_at)
+    VALUES (?, ?, ?, ?)
+");
+$stmtInsert->bind_param("isss", $customerId, $email, $tokenHash, $expiresAt);
+$stmtInsert->execute();
+
+/*
+ * Tam thoi chua gui mail that.
+ * Buoi 3 se tao link reset de test bang tay.
+ */
+$resetLink = 'http://localhost/PHP/SneakerStore/index.php?page=reset_password&token=' . urlencode($rawToken);
+
+/*
+ * Chi dung de hoc va test local.
+ * Buoi 4 se thay bang gui Gmail that.
+ */
+$_SESSION['forgot_password_debug_link'] = $resetLink;
+
+header('Location: ../../index.php?page=forgot_password');
+exit;
+```
+
+---
+
+# **10. Sửa `forgot_password.php` để hiện reset link test**
+Hiện tại file [forgot_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/page/forgot_password.php) mới đọc:
+- `forgot_password_message`
+- `forgot_password_error`
+
+Bây giờ thêm phần đọc `forgot_password_debug_link`.
+
+Sửa đầu file thành:
+
+```php
+<?php
+$message = $_SESSION['forgot_password_message'] ?? '';
+$error = $_SESSION['forgot_password_error'] ?? '';
+$debugLink = $_SESSION['forgot_password_debug_link'] ?? '';
+
+unset($_SESSION['forgot_password_message']);
+unset($_SESSION['forgot_password_error']);
+unset($_SESSION['forgot_password_debug_link']);
+?>
+```
+
+Và thêm đoạn này dưới phần message/error:
+
+```php
+<?php if ($debugLink !== ''): ?>
+    <p><strong>Debug reset link:</strong></p>
+    <p>
+        <a href="<?php echo htmlspecialchars($debugLink); ?>">
+            <?php echo htmlspecialchars($debugLink); ?>
+        </a>
+    </p>
+<?php endif; ?>
+```
+
+### Vì sao làm vậy
+Buổi 3 bạn chưa gửi Gmail thật, nhưng bạn vẫn có thể:
+- nhập email
+- submit
+- lấy được reset link ngay trên màn hình
+- bấm vào đó để test tiếp
+
+---
+
+# **11. Sửa `reset_password.php` cho đúng đường dẫn**
+Trong [reset_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/page/reset_password.php), bạn đang dùng:
+
+```php
+<form action="/PHP/SneakerStore/auth/handle/perform_reset.php" method="post">
+```
+
+Đổi thành:
+
+```php
+<form action="/PHP/SneakerStore/auth/password/perform_reset.php" method="post">
+```
+
+Hoặc nếu muốn đồng nhất tương đối hơn:
+
+```php
+<form action="auth/password/perform_reset.php" method="post">
+```
+
+Với project hiện tại, cả 2 cách đều được.  
+Nếu bạn đang dùng nhiều đường dẫn tuyệt đối kiểu `/PHP/SneakerStore/...`, cứ giữ tuyệt đối cho thống nhất.
+
+---
+
+# **12. `verify_token.php` ở Buổi 3 nên viết gì**
+Buổi 3 chưa cần hoàn thiện 100%, nhưng nên viết helper thật để Buổi 4-5 dùng luôn.
+
+Điền vào file [verify_token.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/verify_token.php):
+
+```php
+<?php
+function findValidPasswordResetToken(mysqli $conn, string $token): ?array
+{
+    if ($token === '') {
+        return null;
+    }
+
+    $tokenHash = hash('sha256', $token);
+
+    $stmt = $conn->prepare("
+        SELECT *
+        FROM password_resets
+        WHERE token_hash = ?
+          AND used_at IS NULL
+          AND expires_at >= NOW()
+        LIMIT 1
+    ");
+    $stmt->bind_param("s", $tokenHash);
+    $stmt->execute();
+
+    $result = $stmt->get_result();
+    $resetRow = $result->fetch_assoc();
+
+    return $resetRow ?: null;
+}
+```
+
+### Vai trò của hàm này
+Hàm này giúp:
+- nhận token thô từ URL
+- hash lại
+- tìm trong DB
+- chỉ trả về token còn hiệu lực
+
+---
+
+# **13. `perform_reset.php` ở Buổi 3**
+Buổi này chưa cập nhật password thật, nhưng bạn có thể sửa skeleton để chuẩn bị cho Buổi 4-5:
+
+```php
+<?php
+session_start();
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/verify_token.php';
+
+$token = trim($_POST['token'] ?? '');
+$password = trim($_POST['password'] ?? '');
+$confirmPassword = trim($_POST['confirm_password'] ?? '');
+
+if ($token === '' || $password === '' || $confirmPassword === '') {
+    $_SESSION['reset_password_error'] = 'Vui long nhap day du thong tin.';
+    header('Location: ../../index.php?page=reset_password&token=' . urlencode($token));
+    exit;
+}
+
+if ($password !== $confirmPassword) {
+    $_SESSION['reset_password_error'] = 'Mat khau xac nhan khong khop.';
+    header('Location: ../../index.php?page=reset_password&token=' . urlencode($token));
+    exit;
+}
+
+$resetRow = findValidPasswordResetToken($conn, $token);
+
+if (!$resetRow) {
+    $_SESSION['reset_password_error'] = 'Link dat lai mat khau khong hop le hoac da het han.';
+    header('Location: ../../index.php?page=forgot_password');
+    exit;
+}
+
+/*
+ * Buoi 3 chua update password that.
+ * Buoi 4-5 moi xu ly tiep.
+ */
+$_SESSION['reset_password_message'] = 'Token hop le. Buoi tiep theo se cap nhat mat khau moi.';
+header('Location: ../../index.php?page=reset_password&token=' . urlencode($token));
+exit;
+```
+
+---
+
+# **14. Điều bạn phải hiểu sau Buổi 3**
+Sau buổi này bạn phải hiểu rõ:
+
+- token reset khác password
+- token phải được tạo bằng random mạnh
+- token gửi cho user là token thô
+- DB chỉ lưu `token_hash`
+- reset link hiện tại mới là link test nội bộ
+- `verify_token.php` là nền cho các bước sau
+
+---
+
+# **15. Cách test Buổi 3**
+Test theo đúng thứ tự:
+
+1. Mở:
+   - `index.php?page=forgot_password`
+2. Nhập một email có tồn tại trong bảng `customers`
+3. Submit form
+4. Trang sẽ hiện:
+   - thông báo chung
+   - debug reset link
+5. Bấm vào reset link đó
+6. Vào trang:
+   - `index.php?page=reset_password&token=...`
+7. Nhập password thử
+8. Submit
+9. Hệ thống sẽ báo:
+   - token hợp lệ
+   - nhưng chưa cập nhật password thật
+
+Nếu bạn nhập email không tồn tại:
+- vẫn phải nhận đúng thông báo chung
+- không được lộ “email không tồn tại”
+
+---
+
+# **16. Các lỗi rất dễ gặp**
+Bạn cần tránh:
+
+- quên `session_start()` trong file xử lý
+- lưu token thô vào DB thay vì hash
+- dùng `md5` cho token
+- dùng token quá ngắn
+- để form action sai đường dẫn
+- quên xóa token cũ trước khi tạo token mới
+- để debug link hiện ở production
+
+---
+
+# **17. Checklist Buổi 3**
+Bạn làm xong 5 việc sau:
+
+1. điền [request_reset.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/request_reset.php)
+2. điền [verify_token.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/verify_token.php)
+3. sửa [forgot_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/page/forgot_password.php) để hiện debug link
+4. sửa action trong [reset_password.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/page/reset_password.php)
+5. điền skeleton mới cho [perform_reset.php](C:/Users/toann/Desktop/PHP/SneakerStore/auth/password/perform_reset.php)
+
+---
+
+# **18. Buổi 4 sẽ làm gì**
+Sau khi Buổi 3 chạy ổn, Buổi 4 sẽ chuyển từ “debug link hiện trên màn hình” sang:
+
+- gửi reset link về Gmail thật
+- cài PHPMailer
+- cấu hình Gmail SMTP
+- tách mail template
+- bỏ debug link khỏi màn hình
+
+Nếu muốn, tôi có thể tiếp tục ngay **Buổi 4** sau khi bạn xong Buổi 3.

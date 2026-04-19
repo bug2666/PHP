@@ -32,6 +32,12 @@ switch ($page) {
     case 'infoUser':
         include __DIR__ . '/user/infoUser.php';
         break;
+    case 'forgot_password':
+        include __DIR__ . '/../auth/page/forgot_password.php';
+        break;
+    case 'reset_password':
+        include __DIR__ . '/../auth/page/reset_password.php';
+        break;
     default:
         include __DIR__ . '/home.php';
 }
