@@ -1,2 +1,0 @@
-cài thư viện cho production
-composer install --no-dev --optimize-autoloader
