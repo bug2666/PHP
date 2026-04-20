@@ -5,10 +5,20 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 
+if (!class_exists('Google_Client')) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Google_Client class not found.'
+    ]);
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
+
 
 $rawInput = file_get_contents('php://input'); // lấy các giá trị mà _post hoặc _get không lấy được
 $data = json_decode($rawInput, true); // chuyển dữ liệu về dạng mảng
