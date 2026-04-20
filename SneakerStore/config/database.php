@@ -1,11 +1,8 @@
 <?php
-$servername = "localhost";
-$username = "pxzwksde_test";
-$password = "KYDKsGH47WpFGU4zjcyb";
-$dbname = "pxzwksde_test";
+require_once __DIR__.'/env.php';
 
 // Create connection
-$conn = new mysqli($servername, $username, $password, $dbname);
+$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
 // Check connection
 if ($conn->connect_error) {
