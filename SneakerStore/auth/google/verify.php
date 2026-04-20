@@ -1,183 +1,285 @@
 <?php
 session_start();
 
-require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/../../vendor/autoload.php';
-
-if (!class_exists('Google_Client')) {
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Google_Client class not found.'
-    ]);
-    exit;
-}
-
 header('Content-Type: application/json; charset=utf-8');
 
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-
-
-$rawInput = file_get_contents('php://input'); // lấy các giá trị mà _post hoặc _get không lấy được
-$data = json_decode($rawInput, true); // chuyển dữ liệu về dạng mảng
-
-$idToken = $data['credential'] ?? ''; // lấy token mà gg trả về khi login 
-
-if ($idToken === '') {
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Missing Google credential.'
-    ]);
+function jsonResponse(int $statusCode, array $data): void
+{
+    http_response_code($statusCode);
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-$client = new Google_Client(['client_id' => GOOGLE_CLIENT_ID]);
-$payload = $client->verifyIdToken($idToken);
+try {
+    $databaseFile = __DIR__ . '/../../config/database.php';
+    $configFile = __DIR__ . '/config.php';
+    $autoloadFile = __DIR__ . '/../../vendor/autoload.php';
 
-if (!$payload) {
-    http_response_code(401);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Invalid Google ID token.'
+    if (!file_exists($databaseFile)) {
+        jsonResponse(500, [
+            'success' => false,
+            'message' => 'Missing config/database.php'
+        ]);
+    }
+
+    if (!file_exists($configFile)) {
+        jsonResponse(500, [
+            'success' => false,
+            'message' => 'Missing auth/google/config.php'
+        ]);
+    }
+
+    if (!file_exists($autoloadFile)) {
+        jsonResponse(500, [
+            'success' => false,
+            'message' => 'Missing vendor/autoload.php'
+        ]);
+    }
+
+    require_once $databaseFile;
+    require_once $configFile;
+    require_once $autoloadFile;
+
+    if (!class_exists('Google_Client')) {
+        jsonResponse(500, [
+            'success' => false,
+            'message' => 'Google_Client class not found.'
+        ]);
+    }
+
+    $rawInput = file_get_contents('php://input');
+    $data = json_decode($rawInput, true);
+
+    if (!is_array($data)) {
+        jsonResponse(400, [
+            'success' => false,
+            'message' => 'Invalid JSON body.'
+        ]);
+    }
+
+    $idToken = trim((string) ($data['credential'] ?? ''));
+
+    if ($idToken === '') {
+        jsonResponse(400, [
+            'success' => false,
+            'message' => 'Missing Google credential.'
+        ]);
+    }
+
+    $client = new Google_Client([
+        'client_id' => GOOGLE_CLIENT_ID
     ]);
-    exit;
-}
 
-$googleSub = $payload['sub'] ?? '';
-$email = $payload['email'] ?? '';
-$fullName = $payload['name'] ?? 'Google User';
-$avatarUrl = $payload['picture'] ?? null;
-$emailVerified = !empty($payload['email_verified']) ? 1 : 0;
+    $payload = $client->verifyIdToken($idToken);
 
-if ($googleSub === '' || $email === '') {
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Google token payload is incomplete.'
-    ]);
-    exit;
-}
-// kiểm tra theo google_sub
+    if (!$payload) {
+        jsonResponse(401, [
+            'success' => false,
+            'message' => 'Invalid Google ID token.'
+        ]);
+    }
 
-$stmt = $conn->prepare("
-    SELECT id, full_name, email
-    FROM customers
-    WHERE google_sub = ?
-    LIMIT 1
-");
-$stmt->bind_param('s', $googleSub);
-$stmt->execute();
-$result = $stmt->get_result();
-$customer = $result->fetch_assoc();
+    $googleSub = trim((string) ($payload['sub'] ?? ''));
+    $email = trim((string) ($payload['email'] ?? ''));
+    $fullName = trim((string) ($payload['name'] ?? 'Google User'));
+    $avatarUrl = trim((string) ($payload['picture'] ?? ''));
+    $emailVerified = !empty($payload['email_verified']) ? 1 : 0;
+    $redirect = defined('GOOGLE_LOGIN_SUCCESS_REDIRECT')
+        ? GOOGLE_LOGIN_SUCCESS_REDIRECT
+        : '/index.php';
 
-if ($customer) {
-    $customerId = (int) $customer['id'];
+    if ($googleSub === '' || $email === '') {
+        jsonResponse(400, [
+            'success' => false,
+            'message' => 'Google token payload is incomplete.'
+        ]);
+    }
 
     $stmt = $conn->prepare("
-        UPDATE customers
-        SET full_name = ?, avatar_url = ?, email_verified = ?, last_login_at = NOW()
-        WHERE id = ?
+        SELECT id, full_name, email
+        FROM customers
+        WHERE google_sub = ?
+        LIMIT 1
     ");
-    $stmt->bind_param('ssii', $fullName, $avatarUrl, $emailVerified, $customerId);
-    $stmt->execute();
+
+    if (!$stmt) {
+        jsonResponse(500, [
+            'success' => false,
+            'message' => 'Prepare failed (find by google_sub): ' . $conn->error
+        ]);
+    }
+
+    $stmt->bind_param('s', $googleSub);
+
+    if (!$stmt->execute()) {
+        jsonResponse(500, [
+            'success' => false,
+            'message' => 'Execute failed (find by google_sub): ' . $stmt->error
+        ]);
+    }
+
+    $result = $stmt->get_result();
+    $customer = $result->fetch_assoc();
+
+    if ($customer) {
+        $customerId = (int) $customer['id'];
+
+        $stmt = $conn->prepare("
+            UPDATE customers
+            SET full_name = ?, avatar_url = ?, email_verified = ?, last_login_at = NOW()
+            WHERE id = ?
+        ");
+
+        if (!$stmt) {
+            jsonResponse(500, [
+                'success' => false,
+                'message' => 'Prepare failed (update existing google_sub user): ' . $conn->error
+            ]);
+        }
+
+        $stmt->bind_param('ssii', $fullName, $avatarUrl, $emailVerified, $customerId);
+
+        if (!$stmt->execute()) {
+            jsonResponse(500, [
+                'success' => false,
+                'message' => 'Execute failed (update existing google_sub user): ' . $stmt->error
+            ]);
+        }
+
+        $_SESSION['customer_id'] = $customerId;
+        $_SESSION['customer_name'] = $fullName;
+        $_SESSION['customer_email'] = $email;
+
+        jsonResponse(200, [
+            'success' => true,
+            'redirect' => $redirect
+        ]);
+    }
+
+    $stmt = $conn->prepare("
+        SELECT id, full_name, email
+        FROM customers
+        WHERE email = ?
+        LIMIT 1
+    ");
+
+    if (!$stmt) {
+        jsonResponse(500, [
+            'success' => false,
+            'message' => 'Prepare failed (find by email): ' . $conn->error
+        ]);
+    }
+
+    $stmt->bind_param('s', $email);
+
+    if (!$stmt->execute()) {
+        jsonResponse(500, [
+            'success' => false,
+            'message' => 'Execute failed (find by email): ' . $stmt->error
+        ]);
+    }
+
+    $result = $stmt->get_result();
+    $customer = $result->fetch_assoc();
+
+    if ($customer) {
+        $customerId = (int) $customer['id'];
+        $authProvider = 'google';
+
+        $stmt = $conn->prepare("
+            UPDATE customers
+            SET google_sub = ?, auth_provider = ?, avatar_url = ?, email_verified = ?, last_login_at = NOW()
+            WHERE id = ?
+        ");
+
+        if (!$stmt) {
+            jsonResponse(500, [
+                'success' => false,
+                'message' => 'Prepare failed (link google to existing email): ' . $conn->error
+            ]);
+        }
+
+        $stmt->bind_param('sssii', $googleSub, $authProvider, $avatarUrl, $emailVerified, $customerId);
+
+        if (!$stmt->execute()) {
+            jsonResponse(500, [
+                'success' => false,
+                'message' => 'Execute failed (link google to existing email): ' . $stmt->error
+            ]);
+        }
+
+        $_SESSION['customer_id'] = $customerId;
+        $_SESSION['customer_name'] = $customer['full_name'];
+        $_SESSION['customer_email'] = $email;
+
+        jsonResponse(200, [
+            'success' => true,
+            'redirect' => $redirect
+        ]);
+    }
+
+    $authProvider = 'google';
+    $nullPassword = null;
+    $phone = '';
+    $address = '';
+
+    $stmt = $conn->prepare("
+        INSERT INTO customers (
+            full_name,
+            email,
+            password,
+            phone,
+            address,
+            google_sub,
+            auth_provider,
+            avatar_url,
+            email_verified,
+            last_login_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    ");
+
+    if (!$stmt) {
+        jsonResponse(500, [
+            'success' => false,
+            'message' => 'Prepare failed (insert new google user): ' . $conn->error
+        ]);
+    }
+
+    $stmt->bind_param(
+        'ssssssssi',
+        $fullName,
+        $email,
+        $nullPassword,
+        $phone,
+        $address,
+        $googleSub,
+        $authProvider,
+        $avatarUrl,
+        $emailVerified
+    );
+
+    if (!$stmt->execute()) {
+        jsonResponse(500, [
+            'success' => false,
+            'message' => 'Execute failed (insert new google user): ' . $stmt->error
+        ]);
+    }
+
+    $customerId = (int) $conn->insert_id;
 
     $_SESSION['customer_id'] = $customerId;
     $_SESSION['customer_name'] = $fullName;
     $_SESSION['customer_email'] = $email;
 
-    echo json_encode([
+    jsonResponse(200, [
         'success' => true,
-        'redirect' => GOOGLE_LOGIN_SUCCESS_REDIRECT
+        'redirect' => $redirect
     ]);
-    exit;
-}
-
-
-// kiểm tra xem khách hàng đã có tài khoản chưa 1. kiểm tra theo email
-$sqlEmail = 'select id, full_name, email from customers where email = ? limit 1';
-
-$stmt = $conn->prepare($sqlEmail);
-$stmt->bind_param('s', $email);
-$stmt->execute();
-
-$result = $stmt->get_result();
-$customer = $result->fetch_assoc();
-
-if ($customer) {
-    $customerId = $customer['id'];
-    $authProvider = 'google'; // báo cáo hệ thống rằng đang login bằng google
-    $stmt = $conn->prepare("
-        UPDATE customers
-        SET google_sub = ?, auth_provider = ?, avatar_url = ?, email_verified = ?, last_login_at = NOW()
-        WHERE id = ?
-    ");
-    $stmt->bind_param('sssii', $googleSub, $authProvider, $avatarUrl, $emailVerified, $customerId);
-    $stmt->execute();
-
-    $_SESSION['customer_id'] = $customerId;
-    $_SESSION['customer_name'] = $customer['full_name'];
-    $_SESSION['customer_email'] = $email;
-
-    echo json_encode([
-        'success' => true,
-        'redirect' => GOOGLE_LOGIN_SUCCESS_REDIRECT
-    ]);
-    exit;
-}
-// trường hợp chưa có tài khoảnn
-$authProvider = 'google';
-$nullPassword = null;
-$phone = '';
-$address = '';
-
-$stmt = $conn->prepare("
-    INSERT INTO customers (
-        full_name,
-        email,
-        password,
-        phone,
-        address,
-        google_sub,
-        auth_provider,
-        avatar_url,
-        email_verified,
-        last_login_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-");
-
-$stmt->bind_param(
-    'ssssssssi',
-    $fullName,
-    $email,
-    $nullPassword,
-    $phone,
-    $address,
-    $googleSub,
-    $authProvider,
-    $avatarUrl,
-    $emailVerified
-);
-
-if (!$stmt->execute()) {
-    http_response_code(500);
-    echo json_encode([
+} catch (Throwable $e) {
+    jsonResponse(500, [
         'success' => false,
-        'message' => 'Could not create customer from Google account.'
+        'message' => $e->getMessage(),
+        'file' => basename($e->getFile()),
+        'line' => $e->getLine()
     ]);
-    exit;
 }
-
-$customerId = $conn->insert_id;
-
-$_SESSION['customer_id'] = $customerId;
-$_SESSION['customer_name'] = $fullName;
-$_SESSION['customer_email'] = $email;
-
-echo json_encode([
-    'success' => true,
-    'redirect' => GOOGLE_LOGIN_SUCCESS_REDIRECT
-]);
-exit;
