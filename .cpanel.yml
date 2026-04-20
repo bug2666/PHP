@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/taphoapr/public_html/PHP/SneakerStore
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/cp -R SneakerStore/. $DEPLOYPATH
