@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script>
     async function handleGoogleCredentialResponse(response) {
         try {
-            const res = await fetch('auth/google/verify.php', {
+            const res = await fetch('<?php echo APP_URL; ?>/auth/google/verify.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -97,7 +97,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 })
             });
 
-            const data = await res.json();
+            const text = await res.text();
+            console.log('verify.php response:', text);
+
+            const data = JSON.parse(text);
 
             if (data.success) {
                 window.location.href = data.redirect || 'index.php';
@@ -106,6 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             alert(data.message || 'Google login failed.');
         } catch (error) {
+            console.error(error);
             alert('Cannot connect to Google login endpoint.');
         }
     }

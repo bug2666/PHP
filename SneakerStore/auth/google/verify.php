@@ -7,6 +7,9 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 $rawInput = file_get_contents('php://input'); // lấy các giá trị mà _post hoặc _get không lấy được
 $data = json_decode($rawInput, true); // chuyển dữ liệu về dạng mảng
 
@@ -95,7 +98,7 @@ $customer = $result->fetch_assoc();
 
 if ($customer) {
     $customerId = $customer['id'];
-    $auth_provider = 'google'; // báo cáo hệ thống rằng đang login bằng google
+    $authProvider = 'google'; // báo cáo hệ thống rằng đang login bằng google
     $stmt = $conn->prepare("
         UPDATE customers
         SET google_sub = ?, auth_provider = ?, avatar_url = ?, email_verified = ?, last_login_at = NOW()

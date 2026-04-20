@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script>
 async function handleGoogleCredentialResponse(response) {
     try {
-        const res = await fetch('auth/google/verify.php', {
+        const res = await fetch('<?php echo APP_URL; ?>/auth/google/verify.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
