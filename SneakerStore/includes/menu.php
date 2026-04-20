@@ -16,11 +16,13 @@
     <nav>
         <a href="<?php echo APP_URL; ?>/index.php">Trang chủ</a>
         <a href="<?php echo APP_URL; ?>/index.php?page=cart">Giỏ hàng</a>
+
         <?php if (isset($_SESSION['customer_name'])): ?>
             <a href="<?php echo APP_URL; ?>/index.php?page=infoUser">
                 <span>Xin chào, <?php echo htmlspecialchars($_SESSION['customer_name']); ?></span>
             </a>
 
+            <a href="<?php echo APP_URL; ?>/index.php?page=my_orders">Đơn hàng của tôi</a>
             <a href="<?php echo APP_URL; ?>/index.php?page=logout">Đăng xuất</a>
         <?php else: ?>
             <a href="<?php echo APP_URL; ?>/index.php?page=login">Đăng nhập</a>

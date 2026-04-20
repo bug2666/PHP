@@ -38,7 +38,9 @@ switch ($page) {
     case 'reset_password':
         include __DIR__ . '/../auth/page/reset_password.php';
         break;
-        
+    case 'my_orders':
+        include __DIR__ . '/user/my_orders.php';
+        break;
     default:
         include __DIR__ . '/home.php';
 }

@@ -15,7 +15,7 @@ $result = $stmt->get_result();
 $customer = $result->fetch_assoc();
 
 if (!$customer) {
-    echo '<p>Khong tim thay thong tin nguoi dung.</p>';
+    echo '<p>Không tim thấy thông tin người dùng.</p>';
     return;
 }
 $success = $_SESSION['success'] ?? '';
@@ -43,5 +43,8 @@ unset($_SESSION['success']);
     <p>Địa chỉ</p>
     <input type="text" name="address" value="<?php echo htmlspecialchars($customer['address']); ?>">
 
+    <p>
+        <a href="index.php?page=my_orders">Xem đơn hàng của tôi </a>
+    </p>
     <button type="submit">Cập nhật</button>
 </form>
