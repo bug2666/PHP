@@ -1,5 +1,8 @@
 <?php
+require_once __DIR__ . '/../password/verify_token.php';
+
 $token = trim($_GET['token'] ?? '');
+$resetRow = findValidPasswordResetToken($conn, $token);
 $message = $_SESSION['reset_password_message'] ?? '';
 $error = $_SESSION['reset_password_error'] ?? '';
 
@@ -17,11 +20,11 @@ unset($_SESSION['reset_password_error']);
     <p style="color: red;"><?php echo htmlspecialchars($error); ?></p>
 <?php endif; ?>
 
-<?php if ($token === ''): ?>
+<?php if ($token === '' || !$resetRow): ?> <!-- chặn người dùng tự nhập token -->
     <p style="color: red;">Link đặt lại mật khẩu không đúng.</p>
     <p><a href="index.php?page=forgot_password">Đặt lại mật khẩu ?</a></p>
 <?php else: ?>
-    <form action="/auth/handle/perform_reset.php" method="post">
+    <form action="auth/password/perform_reset.php" method="post">
         <input type="hidden" name="token" value="<?php echo htmlspecialchars($token); ?>">
 
         <p>

@@ -1,29 +1,24 @@
-<!-- 
-kiểm tra email
-tìm user
-tạo token
-băm token
-lưu vào bảng password_resets
-gửi link reset qua email -->
 
 
 <?php
 session_start();
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../mail/Mailer.php';
-require_once __DIR__ . '/../../mail/templates/reset_password.php';
+require_once __DIR__ . '/../../config/app.php';
+require_once __DIR__ . '/../mail/mailer.php';
+require_once __DIR__ . '/../mail/templates/reset_password.php';
 
 $email = trim($_POST['email'] ?? '');
 
 unset($_SESSION['forgot_password_message']);
 unset($_SESSION['forgot_password_error']);
-unset($_SESSION['forgot_password_debug_link']);
 
-if ($email === '') {
-    $_SESSION['forgot_password_error'] = 'Vui long nhap email.';
+
+if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $_SESSION['forgot_password_error'] = 'Email khong hop le.';
     header('Location: ../../index.php?page=forgot_password');
     exit;
 }
+
 
 $genericMessage = 'Kiểm tra email nếu mail đúng !.';
 
@@ -62,7 +57,8 @@ $stmtInsert = $conn->prepare("
 $stmtInsert->bind_param("isss", $customerId, $email, $tokenHash, $expiresAt);
 $stmtInsert->execute();
 
-$resetLink = 'http://localhost/PHP/SneakerStore/index.php?page=reset_password&token=' . urlencode($rawToken);
+$resetLink = APP_URL . '/index.php?page=reset_password&token=' . urlencode($rawToken);
+
 
 $subject = 'Đặt lại mật khẩu - SneakerStore';
 $htmlBody = buildResetPasswordEmail($resetLink, $email);
@@ -71,3 +67,11 @@ sendMail($email, $customerName, $subject, $htmlBody);
 
 header('Location: ../../index.php?page=forgot_password');
 exit;
+
+/*
+kiểm tra email
+tìm user
+tạo token
+băm token
+lưu vào bảng password_resets
+gửi link reset qua email */

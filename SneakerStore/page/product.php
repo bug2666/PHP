@@ -1,8 +1,8 @@
 <?php
 $productID = (int)$_GET['id'];
 $sql = "
-    select products.* , categories.name
-    from products left join categories on products.id = categories.id
+    select products.* , categories.name as category_name
+    from products left join categories on products.category_id = categories.id
     where products.id = ? and products.status = 1
     limit 1
 ";
@@ -13,7 +13,7 @@ $sttm->execute(); // thực thi trả về true false
 $result = $sttm->get_result();
 $product = $result->fetch_assoc();
 
-if (!$product) echo 'sản phầm không tồn tại';
+if (!$product) {echo 'sản phầm không tồn tại'; return;} 
 
 $name = htmlspecialchars($product['name']);
 $image = htmlspecialchars($product['image']);

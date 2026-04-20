@@ -9,7 +9,7 @@ $categoryResult = $conn->query($sql);
 ?>
 <form action="modules/products/handle.php" method="post" enctype="multipart/form-data">
     <input type="hidden" name="action" value="create">
-    <input type="hidden" name="id" value="<?php echo (int) $category['id'];?>">
+
 
     <p>
         <label>Tên sản phẩm</label>

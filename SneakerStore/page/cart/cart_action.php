@@ -7,7 +7,6 @@ if (!isset($_SESSION['cart'])) $_SESSION['cart'] = [];
 
 if($action === 'add'){
     $productid = isset($_POST['productid']) ? (int)$_POST['productid'] : 0;
-    echo $productid;
     $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
     $quantity = max(1,$quantity);
 

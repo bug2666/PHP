@@ -3,7 +3,7 @@
 session_start();
 require_once __DIR__ . '/..//..//config/database.php';
 if (!isset($_SESSION['customer_id'])) {
-    header('LocationmL: ../index.php?page=login');
+    header('LocationmL: ../../index.php?page=login');
     exit;
 }
 $cart = $_SESSION['cart'] ?? [];
@@ -22,7 +22,7 @@ if ($receiverName == '' || $receiverPhone == '' || $receiverAddress == '') {
 $customerId = (int) $_SESSION['customer_id'];
 $totalAmount = 0;
 foreach ($cart as $item) {
-    $totalAmount = $item['price'] * $item['quantity'];
+    $totalAmount += $item['price'] * $item['quantity'];
 }
 
 $conn->begin_transaction(); //  bắt đầu gói xử lí

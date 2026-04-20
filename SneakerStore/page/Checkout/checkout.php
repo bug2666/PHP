@@ -24,14 +24,16 @@ if (empty($cart)) {
         <th>Đơn giá</th>
         <th>Tạm tính</th>
     </tr>
-
+    <?php $total = 0; ?>
     <?php foreach ($cart as $item): ?>
-        <?php $subtotal = $item['price'] * $item['quantity']; ?>
+        <?php $subtotal = $item['price'] * $item['quantity'];
+              $total += $subtotal;
+        ?>
         <tr>
             <td><?php echo htmlspecialchars($item['name']); ?></td>
             <td><?php echo (int) $item['quantity']; ?></td>
             <td><?php echo number_format($item['price'], 0, ',', '.'); ?> VND</td>
-            <td><?php echo number_format($subtotal, 0, ',', '.'); ?> VND</td>
+            <td><?php echo number_format($total, 0, ',', '.'); ?> VND</td>
         </tr>
     <?php endforeach; ?>
 

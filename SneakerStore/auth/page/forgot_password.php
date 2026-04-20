@@ -17,7 +17,7 @@ unset($_SESSION['forgot_password_error']);
 <?php endif; ?>
 
 
-<form action="auth/password/perform_reset.php" method="post">
+<form action="auth/password/request_reset.php" method="post">
     <p>
         <label>Email</label><br>
         <input type="email" name="email" required>

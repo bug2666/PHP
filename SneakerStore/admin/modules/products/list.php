@@ -43,7 +43,7 @@ $result = $conn->query($sql);
             <td>
                 <a href="index.php?action=products&query=edit&id=<?php echo $row['id']; ?>">Sửa</a>
                 |
-                <a href="modules/products/handle.php?action=delete&id=<?php echo $row['id']; ?>" onclick="confirm('Xóa sản phẩm này?');">Xóa</a>
+                <a href="modules/products/handle.php?action=delete&id=<?php echo $row['id']; ?>" onclick=" return confirm('Xóa sản phẩm này?');">Xóa</a>
             </td>
         </tr>
     <?php endwhile; ?>

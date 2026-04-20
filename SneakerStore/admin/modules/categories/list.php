@@ -22,7 +22,7 @@ $result = $conn->query("SELECT * FROM categories ORDER BY sort_order ASC, id DES
             <td><?php echo (int) $row['status'] === 1 ? 'Hiện' : 'Ẩn'; ?></td>
             <td>
                 <a href="index.php?action=categories&query=edit&id=<?php echo $row['id']; ?>">Sửa</a>
-                <a href="modules/categories/handle.php?action=delete&id=<?php echo $row['id']; ?>" onclick="confirm('Xóa danh mục này?');">Xóa</a>
+                <a href="modules/categories/handle.php?action=delete&id=<?php echo $row['id']; ?>" onclick=" return confirm('Xóa danh mục này?');">Xóa</a>
             </td>
         </tr>
     <?php endwhile; ?>

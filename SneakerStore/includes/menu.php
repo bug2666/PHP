@@ -1,3 +1,5 @@
+<?php require_once __DIR__ . '/config/app.php'; ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -12,20 +14,20 @@
     $result = $conn->query($sql);
     ?>
     <nav>
-        <a href="/PHP/SneakerStore/index.php">Trang chủ</a>
-        <a href="/PHP/SneakerStore/index.php?page=cart">Giỏ hàng</a>
+        <a href="<?php echo APP_URL; ?>/index.php">Trang chủ</a>
+        <a href="<?php echo APP_URL; ?>/index.php?page=cart">Giỏ hàng</a>
         <?php if (isset($_SESSION['customer_name'])): ?>
-            <a href="/PHP/SneakerStore/index.php?page=infoUser">
+            <a href="<?php echo APP_URL; ?>/index.php?page=infoUser">
                 <span>Xin chào, <?php echo htmlspecialchars($_SESSION['customer_name']); ?></span>
             </a>
 
-            <a href="/PHP/SneakerStore/index.php?page=logout">Đăng xuất</a>
+            <a href="<?php echo APP_URL; ?>/index.php?page=logout">Đăng xuất</a>
         <?php else: ?>
-            <a href="/PHP/SneakerStore/index.php?page=login">Đăng nhập</a>
-            <a href="/PHP/SneakerStore/index.php?page=register">Đăng kí</a>
+            <a href="<?php echo APP_URL; ?>/index.php?page=login">Đăng nhập</a>
+            <a href="<?php echo APP_URL; ?>/index.php?page=register">Đăng kí</a>
         <?php endif; ?>
 
-        <a href="/PHP/SneakerStore/index.php?page=contact">Liên hệ</a>
+        <a href="<?php echo APP_URL; ?>/index.php?page=contact">Liên hệ</a>
     </nav>
     <h3>Danh mục sản phẩm</h3>
     <ul>

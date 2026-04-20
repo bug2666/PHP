@@ -1,4 +1,4 @@
-<!-- hàm gửi mail chung -->
+
 <?php
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -37,3 +37,4 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
     }
 }
 ?>
+<!-- hàm gửi mail chung -->
