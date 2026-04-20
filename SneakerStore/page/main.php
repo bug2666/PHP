@@ -41,6 +41,9 @@ switch ($page) {
     case 'my_orders':
         include __DIR__ . '/user/my_orders.php';
         break;
+    case 'my_order_detail':
+        include __DIR__ . '/user/my_order_detail.php';
+        break;
     default:
         include __DIR__ . '/home.php';
 }
